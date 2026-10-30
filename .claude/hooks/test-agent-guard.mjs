@@ -4,7 +4,9 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
 const TEST_FILE = /^(backend\/tests\/[\w.-]+\.test\.ts|frontend\/src\/[\w./-]+\.test\.tsx?)$/
-const SAFE_TOKEN = /^[\w@./:=,+-]+$/
+const SAFE_TOKEN = /^[\w@./:=,+*?-]+$/
+const QUOTED = /^'([^']*)'$|^"([^"$`\\]*)"$/
+const FIND_ACTIONS = /^-(exec|execdir|ok|okdir|delete|fprint|fprint0|fprintf|fls)$/
 const PACKAGES = ['backend', 'frontend']
 
 const input = JSON.parse(readFileSync(0, 'utf8'))
@@ -34,14 +36,14 @@ function isTracked(file, base) {
 }
 
 function unquote(token) {
-  const quoted = /^'([^']*)'$|^"([^"$`\\]*)"$/.exec(token)
+  const quoted = QUOTED.exec(token)
   return quoted ? (quoted[1] ?? quoted[2]) : token
 }
 
 function tokens(command) {
-  const parts = command.trim().split(/\s+/).map(unquote)
-  if (!parts.every((part) => SAFE_TOKEN.test(part))) deny(`unsupported characters in: ${command}`)
-  return parts
+  const parts = command.trim().split(/\s+/)
+  if (!parts.every((part) => QUOTED.test(part) || SAFE_TOKEN.test(part))) deny(`unsupported characters in: ${command}`)
+  return parts.map(unquote)
 }
 
 function checkBash(command) {
@@ -71,6 +73,8 @@ function checkBash(command) {
     if (sub === 'checkout' && args[0] === '--' && args.length === 2 && isTestFile(args[1], base)) return
     deny(`git command not allowed: ${rest}`)
   }
+  if (program === 'ls' || program === 'grep') return
+  if (program === 'find' && ![sub, ...args].some((a) => FIND_ACTIONS.test(a))) return
   if (program === 'rm' && args.length === 0 && sub && isTestFile(sub, base) && !isTracked(sub, base)) return
   deny(`command not allowed: ${rest}`)
 }
