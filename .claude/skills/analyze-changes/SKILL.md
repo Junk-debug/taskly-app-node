@@ -45,8 +45,9 @@ related tests before deciding.
 | Uncovered changed lines and `testExists: true` | **update**: add cases to the existing file. |
 | A related test fails and the diff intentionally changed that behaviour (new message, new status code, new field) | **update** the assertion to the new contract. |
 | A related test fails and the diff does not explain it | Do not touch the test or the code. Record a **suspected bug**. |
+| New file (`status: added`) or new exported function, covered only because another module's test happens to execute it | **create** / **update** a test that asserts its behaviour directly. Incidental coverage is not a test. |
 | Covered, tests pass, but the change adds behaviour the existing assertions do not check (for example a new field in a response that `toEqual` would not catch) | **update** with a precise assertion. |
-| Covered, tests pass, assertions already pin the behaviour | **skip**: name the test that covers it. |
+| Covered, tests pass, assertions already pin the behaviour | **skip**: name the test and the assertion that pin it. "Line is executed" alone is not a reason to skip. |
 | Rename, formatting, comment or type-only change | **skip**: no behaviour change. |
 | File is in "What is not worth a unit test" in `TESTING.md` | **skip** with that reason. |
 | `deleted[]` entry with `testExists: true` | Do not delete anything. Report the possibly orphaned test. |
