@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { formatDate, isOverdue, selectTodos, validateTodo } from './todos'
+import {
+  countCompleted,
+  formatDate,
+  isOverdue,
+  selectTodos,
+  validateTodo,
+} from './todos'
 import type { Todo, TodoInput } from '../types'
 
 const base: Todo = {
@@ -130,6 +136,21 @@ describe('isOverdue', () => {
   ])('due %s, completed %s → overdue %s', (due_date, completed, expected) => {
     vi.useFakeTimers({ now: new Date(2026, 9, 15, 9, 0) })
     expect(isOverdue({ ...base, due_date, completed })).toBe(expected)
+  })
+})
+
+describe('countCompleted', () => {
+  it('counts only completed tasks', () => {
+    const todos = [
+      base,
+      { ...base, id: 2, completed: true },
+      { ...base, id: 3, completed: true },
+    ]
+    expect(countCompleted(todos)).toBe(2)
+  })
+
+  it('returns 0 for an empty list', () => {
+    expect(countCompleted([])).toBe(0)
   })
 })
 
