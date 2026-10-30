@@ -5,19 +5,19 @@ description: Produce the final report of a unit-test run (decisions per file, te
 
 # Report results
 
-The report must match [report.schema.json](report.schema.json). In CI the same
-schema is passed to Claude Code as `--json-schema`, so return it as the final
-structured output. Locally, print it as the Markdown below.
+Your final message is the report. In CI it is posted to the pull request
+as-is, next to the workflow's own verification results, so use exactly the
+Markdown format below and nothing else after it.
 
 ## Rules
 
-- One `decisions` entry per changed source from `analyze-changes`, skips included.
+- One table row per changed source from `analyze-changes`, skips included.
   A skip without a reason is not allowed.
-- `tests` lists only test files you created or modified, with the cases you
+- **Tests** lists only test files you created or modified, with the cases you
   added or changed, the final result and the number of runs.
-- `suspectedBugs` only for failures classified as code bugs by
+- **Suspected bugs** only for failures classified as code bugs by
   `run-and-fix-tests`; quote the expected and actual values.
-- `dropped` lists cases you removed because they could not be made to pass.
+- **Dropped** lists cases you removed because they could not be made to pass.
 - Report facts only: test counts and results come from the commands you ran,
   not from expectations.
 

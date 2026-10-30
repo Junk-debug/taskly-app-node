@@ -1,7 +1,6 @@
 ---
 name: write-backend-unit-test
 description: Write or update a Vitest unit test for a backend source file (Express router, Prisma repository, zod validators, mappers, config, app factory). Use when a file under backend/src needs a new or updated test.
-paths: backend/**
 ---
 
 # Write a backend unit test

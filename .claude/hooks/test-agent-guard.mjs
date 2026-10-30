@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { appendFileSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 
 const TEST_FILE = /^(backend\/tests\/[\w.-]+\.test\.ts|frontend\/src\/[\w./-]+\.test\.tsx?)$/
@@ -13,7 +13,15 @@ const input = JSON.parse(readFileSync(0, 'utf8'))
 const root = path.resolve(process.env.CLAUDE_PROJECT_DIR || input.cwd || process.cwd())
 const cwd = path.resolve(input.cwd || root)
 
+function audit(decision, reason) {
+  const log = process.env.TEST_AGENT_GUARD_LOG
+  if (!log) return
+  const target = input.tool_input?.file_path ?? input.tool_input?.command ?? ''
+  appendFileSync(log, `${JSON.stringify({ decision, tool: input.tool_name, target, reason })}\n`)
+}
+
 function deny(reason) {
+  audit('deny', reason)
   process.stderr.write(`Blocked by test-agent guard: ${reason}\n`)
   process.exit(2)
 }
@@ -52,7 +60,7 @@ function checkBash(command) {
   const cd = /^cd\s+(\S+)\s+&&\s+(.+)$/s.exec(rest)
   if (cd) {
     const target = path.resolve(cwd, unquote(cd[1]))
-    if (!PACKAGES.some((pkg) => target === path.join(root, pkg))) deny(`cd only into backend/ or frontend/: ${command}`)
+    if (target !== root && !PACKAGES.some((pkg) => target === path.join(root, pkg))) deny(`cd only into the repository root, backend/ or frontend/: ${command}`)
     base = target
     rest = cd[2]
   }
@@ -89,4 +97,5 @@ if (['Write', 'Edit', 'MultiEdit'].includes(tool)) {
 } else if (tool === 'Bash') {
   checkBash(toolInput.command ?? '')
 }
+audit('allow')
 process.exit(0)
