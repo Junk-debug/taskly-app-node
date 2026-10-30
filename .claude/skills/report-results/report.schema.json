@@ -1,21 +1,44 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["summary", "decisions", "tests", "suspectedBugs", "dropped"],
+  "required": [
+    "summary",
+    "decisions",
+    "tests",
+    "suspectedBugs",
+    "dropped"
+  ],
   "properties": {
-    "summary": { "type": "string" },
+    "summary": {
+      "type": "string"
+    },
     "decisions": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["source", "decision", "reason"],
+        "required": [
+          "source",
+          "decision",
+          "reason"
+        ],
         "properties": {
-          "source": { "type": "string" },
-          "decision": { "enum": ["create", "update", "skip"] },
-          "testFile": { "type": "string" },
-          "reason": { "type": "string" }
+          "source": {
+            "type": "string"
+          },
+          "decision": {
+            "enum": [
+              "create",
+              "update",
+              "skip"
+            ]
+          },
+          "testFile": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
         }
       }
     },
@@ -24,12 +47,32 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["file", "cases", "result", "runs"],
+        "required": [
+          "file",
+          "cases",
+          "result",
+          "runs"
+        ],
         "properties": {
-          "file": { "type": "string" },
-          "cases": { "type": "array", "items": { "type": "string" } },
-          "result": { "enum": ["passed", "failed"] },
-          "runs": { "type": "integer", "minimum": 0 }
+          "file": {
+            "type": "string"
+          },
+          "cases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "result": {
+            "enum": [
+              "passed",
+              "failed"
+            ]
+          },
+          "runs": {
+            "type": "integer",
+            "minimum": 0
+          }
         }
       }
     },
@@ -38,13 +81,28 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["source", "description", "expected", "actual"],
+        "required": [
+          "source",
+          "description",
+          "expected",
+          "actual"
+        ],
         "properties": {
-          "source": { "type": "string" },
-          "line": { "type": "integer" },
-          "description": { "type": "string" },
-          "expected": { "type": "string" },
-          "actual": { "type": "string" }
+          "source": {
+            "type": "string"
+          },
+          "line": {
+            "type": "integer"
+          },
+          "description": {
+            "type": "string"
+          },
+          "expected": {
+            "type": "string"
+          },
+          "actual": {
+            "type": "string"
+          }
         }
       }
     },
@@ -53,11 +111,21 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["file", "case", "lastError"],
+        "required": [
+          "file",
+          "case",
+          "lastError"
+        ],
         "properties": {
-          "file": { "type": "string" },
-          "case": { "type": "string" },
-          "lastError": { "type": "string" }
+          "file": {
+            "type": "string"
+          },
+          "case": {
+            "type": "string"
+          },
+          "lastError": {
+            "type": "string"
+          }
         }
       }
     }
