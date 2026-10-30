@@ -89,6 +89,8 @@ function main() {
       lines.push(...listSection('Dropped cases', report.dropped, (d) => `\`${d.file}\` — ${cell(d.case)}: ${cell(d.lastError)}`))
     } else {
       lines.push(`**The agent did not finish** (status: ${options.status ?? 'unknown'}). See the workflow run for details.`, '')
+      const result = options['agent-result'] && existsSync(options['agent-result']) ? readFileSync(options['agent-result'], 'utf8').trim() : ''
+      if (result) lines.push('```', result.slice(0, 1500), '```', '')
     }
     if (verify) lines.push(...verifySection(verify))
     if (guard) {

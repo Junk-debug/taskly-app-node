@@ -128,7 +128,9 @@ jobs:
         env:
           EXECUTION_FILE: ${{ steps.agent.outputs.execution_file }}
         run: |
-          jq -r '.[] | select(.type == "result") | "turns=\(.num_turns) cost=\(.total_cost_usd) error=\(.is_error)\n\(.result // "" | .[0:3000])"' "$EXECUTION_FILE"
+          mkdir -p "$RUNNER_TEMP/agent-output"
+          jq -r '.[] | select(.type == "result") | "turns=\(.num_turns) cost=\(.total_cost_usd) error=\(.is_error)\n\(.result // "" | .[0:3000])"' "$EXECUTION_FILE" \
+            | tee "$RUNNER_TEMP/agent-output/agent-result.txt"
       - name: Collect the agent's changes
         if: always()
         env:
@@ -265,6 +267,7 @@ jobs:
             --report "$A/report.json" \
             --verify "$A/verify.json" \
             --guard "$A/guard.log" \
+            --agent-result "$A/agent-result.txt" \
             --status "$status" \
             --commit "$COMMIT_SHA" \
             --run-url "$RUN_URL" \
