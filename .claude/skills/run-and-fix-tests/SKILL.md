@@ -39,5 +39,8 @@ Vitest does not type-check, so run `tsc` after the tests pass.
 
 - Run the whole package once to make sure nothing else broke.
 - Run `tsc --noEmit` for every package you touched.
+- Re-run the `analyze-changes` script with the same arguments as at the start
+  and check that `uncoveredChangedLines` is empty for every file you covered.
+  Explain any line that stays uncovered (for example unreachable code).
 - Never: edit files outside test files, add `.skip`/`.only`/`.todo`, replace an
   exact assertion with a looser one, delete an existing passing case.
