@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd backend)",
+      "Bash(cd frontend)",
+      "Bash(npx vitest run *)",
+      "Bash(npx vitest related *)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(npx prettier --write *)",
+      "Bash(node .claude/skills/analyze-changes/scripts/changed-sources.mjs *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git status *)",
+      "Bash(git show *)"
+    ],
+    "deny": [
+      "Bash(git push *)",
+      "WebFetch",
+      "WebSearch"
+    ]
+  }
+}
