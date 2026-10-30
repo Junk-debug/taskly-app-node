@@ -78,6 +78,74 @@
         }
       }
     },
+    "/api/todos/stats": {
+      "get": {
+        "summary": "Task statistics",
+        "responses": {
+          "200": {
+            "description": "Counts of tasks by status and priority",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "total",
+                    "active",
+                    "completed",
+                    "overdue",
+                    "byPriority"
+                  ],
+                  "properties": {
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "active": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "completed": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "overdue": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Active tasks whose due date is before today (UTC)"
+                    },
+                    "byPriority": {
+                      "type": "object",
+                      "required": [
+                        "low",
+                        "medium",
+                        "high"
+                      ],
+                      "properties": {
+                        "low": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "medium": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "high": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Database unavailable"
+          }
+        }
+      }
+    },
     "/api/todos/{id}": {
       "parameters": [
         {
