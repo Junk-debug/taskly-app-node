@@ -174,14 +174,15 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: ${{ runner.temp }}/artifacts
+          merge-multiple: true
       - name: Check paths, typecheck, run tests three times, re-measure coverage
         run: |
           A="$RUNNER_TEMP/artifacts"
           mkdir -p "$RUNNER_TEMP/verify"
           node .github/scripts/verify-tests.mjs \
-            --patch "$A/agent-output/tests.patch" \
+            --patch "$A/tests.patch" \
             --base "$BASE_SHA" \
-            --analysis "$A/analysis/analysis.json" \
+            --analysis "$A/analysis.json" \
             --out "$RUNNER_TEMP/verify/verify.json"
           jq . "$RUNNER_TEMP/verify/verify.json"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -216,11 +217,12 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: ${{ runner.temp }}/artifacts
+          merge-multiple: true
       - name: Commit verified tests
         id: commit
         run: |
           A="$RUNNER_TEMP/artifacts"
-          verdict=$(jq -r .verdict "$A/verify/verify.json" 2>/dev/null || echo none)
+          verdict=$(jq -r .verdict "$A/verify.json" 2>/dev/null || echo none)
           if [ "$verdict" != "accepted" ]; then
             echo "Nothing to commit (verdict: $verdict)."
             exit 0
@@ -229,12 +231,12 @@ jobs:
             echo "::notice::The branch moved since it was analyzed; a newer run will handle it."
             exit 0
           fi
-          if git apply --numstat "$A/agent-output/tests.patch" | cut -f3 \
+          if git apply --numstat "$A/tests.patch" | cut -f3 \
             | grep -qvE '^(backend/tests/[A-Za-z0-9._-]+\.test\.ts|frontend/src/[A-Za-z0-9._/-]+\.test\.tsx?)$'; then
             echo "::error::The patch touches files other than unit tests."
             exit 1
           fi
-          git apply "$A/agent-output/tests.patch"
+          git apply "$A/tests.patch"
           git add -- backend/tests frontend/src
           git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
             commit -q -m "test: add unit tests for changed code" -m "Written by unit-test-agent and verified in $RUN_URL"
@@ -253,10 +255,10 @@ jobs:
           script=trusted/.github/scripts/render-report.mjs
           [ -f "$script" ] || script=.github/scripts/render-report.mjs
           node "$script" \
-            --analysis "$A/analysis/analysis.json" \
-            --report "$A/agent-output/report.json" \
-            --verify "$A/verify/verify.json" \
-            --guard "$A/agent-output/guard.log" \
+            --analysis "$A/analysis.json" \
+            --report "$A/report.json" \
+            --verify "$A/verify.json" \
+            --guard "$A/guard.log" \
             --status "$status" \
             --commit "$COMMIT_SHA" \
             --run-url "$RUN_URL" \
