@@ -31,18 +31,24 @@ const EXCLUDED = [
 ]
 
 function parseArgs(argv) {
-  const options = { base: 'origin/main', head: 'HEAD', coverage: true }
+  const options = { base: 'origin/main', head: 'HEAD', coverage: true, files: null }
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--base') options.base = argv[++i]
     else if (argv[i] === '--head') options.head = argv[++i]
     else if (argv[i] === '--no-coverage') options.coverage = false
+    else if (argv[i] === '--files') options.files = argv.slice(i + 1)
     else throw new Error(`Unknown argument: ${argv[i]}`)
+    if (options.files) break
   }
   return options
 }
 
 function git(root, args) {
   return execFileSync('git', args, { cwd: root, encoding: 'utf8' })
+}
+
+function relative(root, file) {
+  return path.relative(root, path.resolve(root, file)).split(path.sep).join('/')
 }
 
 function packageOf(file) {
@@ -62,6 +68,11 @@ function changedFiles(root, range) {
       const status = { A: 'added', M: 'modified', D: 'deleted', R: 'renamed' }[code[0]]
       return { status, path: paths.at(-1) }
     })
+}
+
+function allLines(root, file) {
+  const count = readFileSync(path.join(root, file), 'utf8').split('\n').length
+  return Array.from({ length: count }, (_, i) => i + 1)
 }
 
 function changedLines(root, range, file) {
@@ -138,8 +149,13 @@ function main() {
   const options = parseArgs(process.argv.slice(2))
   const root = git(process.cwd(), ['rev-parse', '--show-toplevel']).trim()
   const range = `${options.base}...${options.head}`
-  const files = changedFiles(root, range).filter((file) => isSource(file.path))
-  const report = { base: options.base, head: options.head, packages: {}, deleted: [], needsAgent: false, reasons: [] }
+  const explicit = Boolean(options.files)
+  const files = explicit
+    ? options.files.map((file) => ({ status: 'explicit', path: relative(root, file) })).filter((file) => isSource(file.path))
+    : changedFiles(root, range).filter((file) => isSource(file.path))
+  const report = explicit
+    ? { files: options.files, packages: {}, deleted: [], needsAgent: false, reasons: [] }
+    : { base: options.base, head: options.head, packages: {}, deleted: [], needsAgent: false, reasons: [] }
 
   for (const file of files.filter((f) => f.status === 'deleted')) {
     const test = PACKAGES[packageOf(file.path)].testFor(file.path)
@@ -156,7 +172,7 @@ function main() {
       relatedTests: related.tests,
       sources: sources.map((source) => {
         const test = PACKAGES[pkg].testFor(source.path)
-        const lines = changedLines(root, range, source.path)
+        const lines = explicit ? allLines(root, source.path) : changedLines(root, range, source.path)
         const fileCoverage = related.coverage[source.path]
         const covered = fileCoverage ? coveredLines(fileCoverage) : null
         const uncovered = covered ? lines.filter((line) => covered.get(line) === false) : lines

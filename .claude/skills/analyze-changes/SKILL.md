@@ -15,6 +15,9 @@ node .claude/skills/analyze-changes/scripts/changed-sources.mjs --base <base-ref
 
 - `<base-ref>` is the branch the work will merge into (`origin/main` by default).
   In CI the prompt gives it to you; locally use `origin/main` unless told otherwise.
+- `--files <path> ...` analyzes the given files instead of a diff: every line
+  counts as changed, so `uncoveredChangedLines` lists all untested lines. Use it
+  when you are asked to cover specific files that are not changed on the branch.
 - `--no-coverage` skips running Vitest; use it only when you need the file list fast.
 
 The script prints JSON:
