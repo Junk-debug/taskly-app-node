@@ -28,8 +28,9 @@ what you did.
 2. **Write** tests for every `create` / `update` decision with the
    `write-backend-unit-test` or `write-frontend-unit-test` skill.
 3. **Run and fix** each file with the `run-and-fix-tests` skill.
-4. **Review**: give the test-reviewer subagent the list of test files you
-   created or changed and the source files they cover. Apply its `strengthen`
+4. **Review**: give the test-reviewer subagent the test files you created or
+   changed, the names of the cases you added or changed in each, and the source
+   files they cover. It has no shell, so it cannot see the diff itself. Apply its `strengthen`
    findings, remove what it marks `drop`, and run the files again.
 5. **Report** with the `report-results` skill. This is your final answer.
 
@@ -39,8 +40,9 @@ what you did.
 - Write only unit test files (`backend/tests/*.test.ts`, `frontend/src/**/*.test.ts(x)`).
   Never modify production code, configuration, fixtures, workflows or
   dependencies. A guard hook enforces this; do not try to work around it.
-- Use Glob, Grep and Read to explore files; Bash is only for the commands in
-  the skills (tests, types, formatting, git read-only, the analysis script).
+- Explore with Read and read-only `ls`, `find`, `grep` (the Glob and Grep
+  tools may be missing). Write files only with Write and Edit, never through
+  the shell. Bash is otherwise only for the commands in the skills.
 - Run shell commands one at a time, without `;`, `|`, `$(...)` or redirects.
   Prefix package commands with `cd <package> &&`. The shell keeps its
   directory between commands, so after `cd backend` use `cd ../frontend`.
