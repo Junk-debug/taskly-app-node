@@ -123,6 +123,12 @@ jobs:
             --permission-mode acceptEdits
             --allowedTools "Read,Write,Edit,Skill,Agent,Glob,Grep,Bash(cd backend),Bash(cd frontend),Bash(cd ../backend),Bash(cd ../frontend),Bash(npx vitest run *),Bash(npx vitest related *),Bash(npx tsc --noEmit),Bash(npx prettier --write *),Bash(node .claude/skills/analyze-changes/scripts/changed-sources.mjs *),Bash(git diff *),Bash(git log *),Bash(git status *),Bash(git show *),Bash(ls *),Bash(find *),Bash(grep *)"
             --json-schema '${{ steps.schema.outputs.json }}'
+      - name: Show the agent's final result
+        if: always() && steps.agent.outputs.execution_file != ''
+        env:
+          EXECUTION_FILE: ${{ steps.agent.outputs.execution_file }}
+        run: |
+          jq -r '.[] | select(.type == "result") | "turns=\(.num_turns) cost=\(.total_cost_usd) error=\(.is_error)\n\(.result // "" | .[0:3000])"' "$EXECUTION_FILE"
       - name: Collect the agent's changes
         if: always()
         env:
