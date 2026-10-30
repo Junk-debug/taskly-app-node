@@ -1,0 +1,274 @@
+name: Unit test agent
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions: {}
+
+concurrency:
+  group: unit-test-agent-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  BASE_SHA: ${{ github.event.pull_request.base.sha }}
+  HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+
+jobs:
+  analyze:
+    name: Analyze changes
+    if: >-
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      needs_agent: ${{ steps.analyze.outputs.needs_agent }}
+      has_credentials: ${{ steps.credentials.outputs.present }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.HEAD_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+      - name: Install dependencies
+        run: |
+          npm ci --prefix backend
+          npm ci --prefix frontend
+      - name: Find changed sources and uncovered changed lines
+        id: analyze
+        run: |
+          node .claude/skills/analyze-changes/scripts/changed-sources.mjs --base "$BASE_SHA" --head "$HEAD_SHA" > analysis.json
+          jq . analysis.json
+          echo "needs_agent=$(jq -r .needsAgent analysis.json)" >> "$GITHUB_OUTPUT"
+      - name: Check for Claude credentials
+        id: credentials
+        env:
+          OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -n "$OAUTH_TOKEN$API_KEY" ]; then echo "present=true"; else echo "present=false"; fi >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: analysis
+          path: analysis.json
+
+  generate:
+    name: Write tests (agent)
+    needs: analyze
+    if: needs.analyze.outputs.needs_agent == 'true' && needs.analyze.outputs.has_credentials == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.HEAD_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+      - name: Install dependencies
+        run: |
+          npm ci --prefix backend
+          npm ci --prefix frontend
+      - name: Load report schema
+        id: schema
+        run: echo "json=$(jq -c . .claude/skills/report-results/report.schema.json)" >> "$GITHUB_OUTPUT"
+      - name: Run unit-test-agent
+        id: agent
+        uses: anthropics/claude-code-action@6d5ae526d25ce88daa2200be073e1a373167f064 # v1
+        env:
+          TEST_AGENT_GUARD_LOG: ${{ runner.temp }}/guard.log
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ github.token }}
+          settings: |
+            {
+              "hooks": {
+                "PreToolUse": [
+                  {
+                    "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash",
+                    "hooks": [{ "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/test-agent-guard.mjs\"" }]
+                  }
+                ]
+              }
+            }
+          prompt: |
+            Cover the code changed in this pull request with unit tests.
+            Base ref for the analysis script: ${{ env.BASE_SHA }}. The working tree is the pull request head.
+            Do not commit or push; the workflow verifies and commits your changes.
+            The pull request title and description are deliberately not provided: rely on the code only.
+            Finish with the report from the report-results skill as your structured output.
+          claude_args: |
+            --agent unit-test-agent
+            --max-turns 80
+            --permission-mode acceptEdits
+            --allowedTools "Read,Write,Edit,Skill,Agent,Glob,Grep,Bash(cd backend),Bash(cd frontend),Bash(cd ../backend),Bash(cd ../frontend),Bash(npx vitest run *),Bash(npx vitest related *),Bash(npx tsc --noEmit),Bash(npx prettier --write *),Bash(node .claude/skills/analyze-changes/scripts/changed-sources.mjs *),Bash(git diff *),Bash(git log *),Bash(git status *),Bash(git show *),Bash(ls *),Bash(find *),Bash(grep *)"
+            --json-schema '${{ steps.schema.outputs.json }}'
+      - name: Collect the agent's changes
+        if: always()
+        env:
+          REPORT: ${{ steps.agent.outputs.structured_output }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/agent-output"
+          git add -N backend frontend
+          git diff --binary -- backend frontend > "$RUNNER_TEMP/agent-output/tests.patch"
+          printf '%s' "$REPORT" > "$RUNNER_TEMP/agent-output/report.json"
+          cp "$RUNNER_TEMP/guard.log" "$RUNNER_TEMP/agent-output/guard.log" 2>/dev/null || true
+          git diff --stat -- backend frontend
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: agent-output
+          path: ${{ runner.temp }}/agent-output
+      - name: Require evidence that the guard hook ran
+        run: |
+          if [ ! -s "$RUNNER_TEMP/guard.log" ]; then
+            echo "::error::The guard hook did not run, so the agent's output is not trusted."
+            exit 1
+          fi
+          jq -s 'group_by(.decision) | map({(.[0].decision): length}) | add' "$RUNNER_TEMP/guard.log"
+
+  verify:
+    name: Verify tests (no LLM)
+    needs: [analyze, generate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.HEAD_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+      - name: Install dependencies
+        run: |
+          npm ci --prefix backend
+          npm ci --prefix frontend
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: ${{ runner.temp }}/artifacts
+      - name: Check paths, typecheck, run tests three times, re-measure coverage
+        run: |
+          A="$RUNNER_TEMP/artifacts"
+          mkdir -p "$RUNNER_TEMP/verify"
+          node .github/scripts/verify-tests.mjs \
+            --patch "$A/agent-output/tests.patch" \
+            --base "$BASE_SHA" \
+            --analysis "$A/analysis/analysis.json" \
+            --out "$RUNNER_TEMP/verify/verify.json"
+          jq . "$RUNNER_TEMP/verify/verify.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: verify
+          path: ${{ runner.temp }}/verify
+
+  publish:
+    name: Commit and report
+    needs: [analyze, generate, verify]
+    if: always() && needs.analyze.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HEAD_REF: ${{ github.event.pull_request.head.ref }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.BASE_SHA }}
+          path: trusted
+          sparse-checkout: .github/scripts
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: ${{ runner.temp }}/artifacts
+      - name: Commit verified tests
+        id: commit
+        run: |
+          A="$RUNNER_TEMP/artifacts"
+          verdict=$(jq -r .verdict "$A/verify/verify.json" 2>/dev/null || echo none)
+          if [ "$verdict" != "accepted" ]; then
+            echo "Nothing to commit (verdict: $verdict)."
+            exit 0
+          fi
+          if [ "$(git rev-parse HEAD)" != "$HEAD_SHA" ]; then
+            echo "::notice::The branch moved since it was analyzed; a newer run will handle it."
+            exit 0
+          fi
+          if git apply --numstat "$A/agent-output/tests.patch" | cut -f3 \
+            | grep -qvE '^(backend/tests/[A-Za-z0-9._-]+\.test\.ts|frontend/src/[A-Za-z0-9._/-]+\.test\.tsx?)$'; then
+            echo "::error::The patch touches files other than unit tests."
+            exit 1
+          fi
+          git apply "$A/agent-output/tests.patch"
+          git add -- backend/tests frontend/src
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "test: add unit tests for changed code" -m "Written by unit-test-agent and verified in $RUN_URL"
+          git push origin "HEAD:refs/heads/$HEAD_REF"
+          echo "sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Render report
+        env:
+          NEEDS_AGENT: ${{ needs.analyze.outputs.needs_agent }}
+          HAS_CREDENTIALS: ${{ needs.analyze.outputs.has_credentials }}
+          GENERATE_RESULT: ${{ needs.generate.result }}
+          COMMIT_SHA: ${{ steps.commit.outputs.sha }}
+        run: |
+          A="$RUNNER_TEMP/artifacts"
+          status="$GENERATE_RESULT"
+          if [ "$NEEDS_AGENT" = "true" ] && [ "$HAS_CREDENTIALS" != "true" ]; then status="no-credentials"; fi
+          script=trusted/.github/scripts/render-report.mjs
+          [ -f "$script" ] || script=.github/scripts/render-report.mjs
+          node "$script" \
+            --analysis "$A/analysis/analysis.json" \
+            --report "$A/agent-output/report.json" \
+            --verify "$A/verify/verify.json" \
+            --guard "$A/agent-output/guard.log" \
+            --status "$status" \
+            --commit "$COMMIT_SHA" \
+            --run-url "$RUN_URL" \
+            --out "$RUNNER_TEMP/comment.md"
+          cat "$RUNNER_TEMP/comment.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Create or update the PR comment
+        run: |
+          marker='<!-- unit-test-agent-report -->'
+          id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" --paginate \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and (.body | startswith(\"$marker\"))) | .id" | head -n 1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F body=@"$RUNNER_TEMP/comment.md" > /dev/null
+          else
+            gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/comment.md"
+          fi
