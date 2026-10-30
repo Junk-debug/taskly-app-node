@@ -1,7 +1,6 @@
 ---
 name: write-frontend-unit-test
 description: Write or update a Vitest + React Testing Library unit test for a frontend source file (React component, TanStack Query hook, plain hook, API module, utility, HTTP client). Use when a file under frontend/src needs a new or updated test.
-paths: frontend/**
 ---
 
 # Write a frontend unit test
