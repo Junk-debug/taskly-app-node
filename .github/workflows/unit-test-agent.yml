@@ -88,9 +88,6 @@ jobs:
         run: |
           npm ci --prefix backend
           npm ci --prefix frontend
-      - name: Load report schema
-        id: schema
-        run: echo "json=$(jq -c . .claude/skills/report-results/report.schema.json)" >> "$GITHUB_OUTPUT"
       - name: Run unit-test-agent
         id: agent
         uses: anthropics/claude-code-action@6d5ae526d25ce88daa2200be073e1a373167f064 # v1
@@ -116,30 +113,28 @@ jobs:
             Base ref for the analysis script: ${{ env.BASE_SHA }}. The working tree is the pull request head.
             Do not commit or push; the workflow verifies and commits your changes.
             The pull request title and description are deliberately not provided: rely on the code only.
-            Finish with the report from the report-results skill as your structured output.
+            Your final message is posted to the pull request: make it the Markdown report from the report-results skill.
           claude_args: |
             --agent unit-test-agent
             --max-turns 80
             --permission-mode acceptEdits
-            --allowedTools "Read,Write,Edit,Skill,Agent,Glob,Grep,Bash(cd backend),Bash(cd frontend),Bash(cd ../backend),Bash(cd ../frontend),Bash(npx vitest run *),Bash(npx vitest related *),Bash(npx tsc --noEmit),Bash(npx prettier --write *),Bash(node .claude/skills/analyze-changes/scripts/changed-sources.mjs *),Bash(git diff *),Bash(git log *),Bash(git status *),Bash(git show *),Bash(ls *),Bash(find *),Bash(grep *)"
-            --json-schema '${{ steps.schema.outputs.json }}'
+            --allowedTools "Read,Write,Edit,Skill,Agent,Glob,Grep,Bash(cd backend),Bash(cd frontend),Bash(cd ../backend),Bash(cd ../frontend),Bash(cd ..),Bash(npx vitest run *),Bash(npx vitest related *),Bash(npx tsc --noEmit),Bash(npx prettier --write *),Bash(node .claude/skills/analyze-changes/scripts/changed-sources.mjs *),Bash(git diff *),Bash(git log *),Bash(git status *),Bash(git show *),Bash(ls *),Bash(find *),Bash(grep *)"
       - name: Show the agent's final result
         if: always() && steps.agent.outputs.execution_file != ''
         env:
           EXECUTION_FILE: ${{ steps.agent.outputs.execution_file }}
         run: |
           mkdir -p "$RUNNER_TEMP/agent-output"
-          jq -r '.[] | select(.type == "result") | "turns=\(.num_turns) cost=\(.total_cost_usd) error=\(.is_error)\n\(.result // "" | .[0:3000])"' "$EXECUTION_FILE" \
+          jq -r '.[] | select(.type == "result") | "turns=\(.num_turns) cost_usd=\(.total_cost_usd) error=\(.is_error)"' "$EXECUTION_FILE" \
             | tee "$RUNNER_TEMP/agent-output/agent-result.txt"
+          jq -r '.[] | select(.type == "result") | .result // ""' "$EXECUTION_FILE" > "$RUNNER_TEMP/agent-output/agent-report.md"
+          cat "$RUNNER_TEMP/agent-output/agent-report.md"
       - name: Collect the agent's changes
         if: always()
-        env:
-          REPORT: ${{ steps.agent.outputs.structured_output }}
         run: |
           mkdir -p "$RUNNER_TEMP/agent-output"
           git add -N backend frontend
           git diff --binary -- backend frontend > "$RUNNER_TEMP/agent-output/tests.patch"
-          printf '%s' "$REPORT" > "$RUNNER_TEMP/agent-output/report.json"
           cp "$RUNNER_TEMP/guard.log" "$RUNNER_TEMP/agent-output/guard.log" 2>/dev/null || true
           git diff --stat -- backend frontend
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -264,7 +259,7 @@ jobs:
           [ -f "$script" ] || script=.github/scripts/render-report.mjs
           node "$script" \
             --analysis "$A/analysis.json" \
-            --report "$A/report.json" \
+            --agent-report "$A/agent-report.md" \
             --verify "$A/verify.json" \
             --guard "$A/guard.log" \
             --agent-result "$A/agent-result.txt" \

@@ -40,15 +40,6 @@ function analysisSection(analysis) {
   ]
 }
 
-function decisionsSection(report) {
-  return [
-    '| Source | Decision | Test file | Reason |',
-    '|---|---|---|---|',
-    ...report.decisions.map((d) => `| \`${d.source}\` | **${d.decision}** | ${d.testFile ? `\`${d.testFile}\`` : ''} | ${cell(d.reason)} |`),
-    '',
-  ]
-}
-
 function verifySection(verify) {
   const icon = { accepted: '✅', rejected: '❌', empty: '➖' }[verify.verdict] ?? '❔'
   const lines = [`**Verification:** ${icon} ${verify.verdict} — ${cell(verify.reason)}`]
@@ -63,15 +54,13 @@ function verifySection(verify) {
   return [...lines, '']
 }
 
-function listSection(title, items, format) {
-  if (!items?.length) return [`**${title}:** none`, '']
-  return [`**${title}:**`, ...items.map((item) => `- ${format(item)}`), '']
+function readText(file) {
+  return file && existsSync(file) ? readFileSync(file, 'utf8').trim() : ''
 }
 
 function main() {
   const options = parseArgs(process.argv.slice(2))
   const analysis = readJson(options.analysis)
-  const report = readJson(options.report)
   const verify = readJson(options.verify)
   const guard = readGuard(options.guard)
   const lines = [MARKER, '## 🧪 Unit test agent', '']
@@ -81,17 +70,9 @@ function main() {
   } else if (analysis && !analysis.needsAgent) {
     lines.push(`**No tests needed.** ${analysis.reasons.join(' ')}`, '', ...analysisSection(analysis))
   } else {
+    const agentReport = readText(options['agent-report'])
+    const agentResult = readText(options['agent-result'])
     if (analysis) lines.push(...analysisSection(analysis))
-    if (report) {
-      lines.push(cell(report.summary), '', ...decisionsSection(report))
-      lines.push(...listSection('Tests written', report.tests, (t) => `\`${t.file}\` (${t.result}, ${t.runs} runs): ${t.cases.map(cell).join('; ')}`))
-      lines.push(...listSection('Suspected bugs', report.suspectedBugs, (b) => `\`${b.source}\`${b.line ? `:${b.line}` : ''} — ${cell(b.description)} (expected ${cell(b.expected)}, actual ${cell(b.actual)})`))
-      lines.push(...listSection('Dropped cases', report.dropped, (d) => `\`${d.file}\` — ${cell(d.case)}: ${cell(d.lastError)}`))
-    } else {
-      lines.push(`**The agent did not finish** (status: ${options.status ?? 'unknown'}). See the workflow run for details.`, '')
-      const result = options['agent-result'] && existsSync(options['agent-result']) ? readFileSync(options['agent-result'], 'utf8').trim() : ''
-      if (result) lines.push('```', result.slice(0, 1500), '```', '')
-    }
     if (verify) lines.push(...verifySection(verify))
     if (guard) {
       lines.push(`**Guard hook:** ${guard.allowed} tool calls allowed, ${guard.denied.length} blocked`)
@@ -99,6 +80,13 @@ function main() {
       lines.push('')
     }
     if (options.commit) lines.push(`**Committed:** ${options.commit}`, '')
+    if (options.status !== 'success') {
+      lines.push(`**The agent did not finish** (status: ${options.status ?? 'unknown'}).`, '')
+      if (agentResult) lines.push('```', agentResult, '```', '')
+    }
+    if (agentReport) {
+      lines.push('<details open><summary><b>Agent report</b></summary>', '', agentReport.slice(0, 8000), '', '</details>', '')
+    }
   }
 
   if (options['run-url']) lines.push(`<sub>[Workflow run](${options['run-url']})</sub>`)
