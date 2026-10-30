@@ -60,7 +60,7 @@ function checkBash(command) {
   const cd = /^cd\s+(\S+)\s+&&\s+(.+)$/s.exec(rest)
   if (cd) {
     const target = path.resolve(cwd, unquote(cd[1]))
-    if (!PACKAGES.some((pkg) => target === path.join(root, pkg))) deny(`cd only into backend/ or frontend/: ${command}`)
+    if (target !== root && !PACKAGES.some((pkg) => target === path.join(root, pkg))) deny(`cd only into the repository root, backend/ or frontend/: ${command}`)
     base = target
     rest = cd[2]
   }
