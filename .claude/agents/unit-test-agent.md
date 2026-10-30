@@ -24,13 +24,15 @@ what you did.
 
 1. **Analyze** with the `analyze-changes` skill against the base ref you were
    given (default `origin/main`). If you were given explicit files instead,
-   treat them as the changed sources and still run the script for coverage.
+   run the script with `--files <paths>` to get their uncovered lines.
 2. **Write** tests for every `create` / `update` decision with the
    `write-backend-unit-test` or `write-frontend-unit-test` skill.
 3. **Run and fix** each file with the `run-and-fix-tests` skill.
 4. **Review**: give the test-reviewer subagent the test files you created or
    changed, the names of the cases you added or changed in each, and the source
-   files they cover. It has no shell, so it cannot see the diff itself. Apply its `strengthen`
+   files they cover. It has no shell, so it cannot see the diff itself. Run
+   it in the foreground and wait for its answer; never end your turn while
+   it is still running. Apply its `strengthen`
    findings, remove what it marks `drop`, and run the files again.
 5. **Report** with the `report-results` skill. This is your final answer.
 
