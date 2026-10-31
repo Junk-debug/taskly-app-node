@@ -93,6 +93,7 @@
                     "active",
                     "completed",
                     "overdue",
+                    "dueToday",
                     "byPriority"
                   ],
                   "properties": {
@@ -112,6 +113,11 @@
                       "type": "integer",
                       "minimum": 0,
                       "description": "Active tasks whose due date is before today (UTC)"
+                    },
+                    "dueToday": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Active tasks due today (UTC)"
                     },
                     "byPriority": {
                       "type": "object",
