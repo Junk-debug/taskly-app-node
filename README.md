@@ -1,5 +1,17 @@
 # Taskly App Node
 
+## Unit test agent
+
+This repository includes a Claude Code agent that writes and updates unit tests
+for changed code. It runs automatically on pull requests.
+
+- **How it works:** [`SOLUTION.md`](SOLUTION.md). **Test rules:** [`TESTING.md`](TESTING.md).
+- **Workflows:**
+  - `CI` runs typecheck, tests with coverage, and the agent tooling tests.
+  - `Unit test agent` runs analyze → agent → verify → commit, and posts a report in the PR. It needs the `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY` secret.
+- **Drafts:** keep a PR in draft while you iterate. The agent runs when the PR is ready for review.
+- **Locally:** `claude --agent unit-test-agent -p "Cover the changes against origin/main with unit tests"`
+
 ## Setup
 
 ```sh
