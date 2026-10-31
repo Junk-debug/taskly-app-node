@@ -97,10 +97,10 @@ jobs:
         run: |
           npm ci --prefix backend
           npm ci --prefix frontend
-      - name: Install bubblewrap for subprocess isolation
+      - name: Install the sandbox dependencies (bubblewrap, socat)
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq bubblewrap
+          sudo apt-get install -y -qq bubblewrap socat
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           bwrap --ro-bind / / --unshare-all true && echo "bubblewrap works"
       - name: Run unit-test-agent
