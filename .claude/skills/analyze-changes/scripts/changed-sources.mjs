@@ -192,6 +192,8 @@ function main() {
     for (const source of report.packages[pkg].sources) {
       if (source.uncoveredChangedLines.length) {
         report.reasons.push(`${source.path}: uncovered changed lines ${source.uncoveredChangedLines.join(', ')}`)
+      } else if (source.status === 'added' && !source.testExists) {
+        report.reasons.push(`${source.path}: new file without its own test (coverage only comes from other modules' tests)`)
       }
     }
   }
