@@ -56,10 +56,16 @@ export function selectTodos(
     })
 }
 
+function localDate(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${date.getFullYear()}-${month}-${day}`
+}
+
 export function isOverdue(todo: Todo): boolean {
-  const today = new Date()
-  const localDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
-  return !todo.completed && !!todo.due_date && todo.due_date < localDate
+  return (
+    !todo.completed && !!todo.due_date && todo.due_date <= localDate(new Date())
+  )
 }
 
 export function formatDate(date: string): string {
