@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 import { execFileSync, spawnSync } from 'node:child_process'
-import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 
 const TEST_FILE = /^(backend\/tests\/[\w.-]+\.test\.ts|frontend\/src\/[\w./-]+\.test\.tsx?)$/
 const RUNS = 3
 
 function parseArgs(argv) {
-  const options = {}
+  const options = { analyzer: '.claude/skills/analyze-changes/scripts/changed-sources.mjs' }
   for (let i = 0; i < argv.length; i += 2) options[argv[i].replace(/^--/, '')] = argv[i + 1]
   for (const name of ['patch', 'base', 'analysis', 'out']) {
     if (!options[name]) throw new Error(`Missing --${name}`)
@@ -57,6 +58,34 @@ function checkPatch(root, patch) {
   return { ok: errors.length === 0, files, errors }
 }
 
+function checkAgainstBase(root, base, analysis, testFiles) {
+  const sources = Object.values(analysis.packages ?? {}).flatMap((pkg) => pkg.sources)
+  if (sources.length === 0 || testFiles.length === 0) return []
+  for (const source of sources) {
+    if (source.status === 'added') rmSync(path.join(root, source.path), { force: true })
+    else run('git', ['checkout', base, '--', source.path], root)
+  }
+  const results = []
+  for (const pkg of ['backend', 'frontend']) {
+    const files = testFiles.filter((file) => file.startsWith(`${pkg}/`))
+    if (files.length === 0) continue
+    const out = path.join(tmpdir(), `against-base-${pkg}-${process.pid}.json`)
+    run('npx', ['vitest', 'run', '--reporter=json', `--outputFile=${out}`, ...files.map((f) => path.relative(pkg, f))], path.join(root, pkg))
+    const report = existsSync(out) ? JSON.parse(readFileSync(out, 'utf8')) : null
+    for (const file of files) {
+      const result = report?.testResults.find((r) => path.relative(root, r.name) === file)
+      results.push({
+        file,
+        detectsChange: !result || result.status !== 'passed',
+        failed: result ? result.assertionResults.filter((a) => a.status === 'failed').length : null,
+        total: result ? result.assertionResults.length : null,
+      })
+    }
+  }
+  run('git', ['checkout', 'HEAD', '--', '.'], root)
+  return results
+}
+
 function main() {
   const options = parseArgs(process.argv.slice(2))
   const root = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim()
@@ -83,7 +112,7 @@ function main() {
     const typecheck = run('npx', ['tsc', '--noEmit'], cwd)
     const runs = []
     for (let i = 0; i < RUNS; i++) {
-      const result = run('npx', ['vitest', 'run'], cwd)
+      const result = run('npx', ['vitest', 'run', ...(i === RUNS - 1 ? ['--sequence.shuffle'] : [])], cwd)
       runs.push({ ok: result.ok, tail: result.ok ? '' : result.output.split('\n').slice(-30).join('\n') })
     }
     verify.packages[pkg] = {
@@ -94,7 +123,7 @@ function main() {
 
   run('git', ['add', '--', ...verify.patch.files.map((f) => f.path)], root)
   run('git', ['-c', 'user.name=verify', '-c', 'user.email=verify@localhost', 'commit', '--no-verify', '-qm', 'verify'], root)
-  const after = run('node', ['.claude/skills/analyze-changes/scripts/changed-sources.mjs', '--base', options.base, '--head', 'HEAD'], root)
+  const after = run('node', [options.analyzer, '--base', options.base, '--head', 'HEAD'], root)
   const beforeLines = uncovered(before)
   const afterLines = after.ok ? uncovered(JSON.parse(after.output)) : {}
   verify.coverage = {
@@ -102,6 +131,8 @@ function main() {
     after: after.ok ? Object.values(afterLines).reduce((a, b) => a + b, 0) : null,
     files: Object.keys(beforeLines).map((file) => ({ path: file, before: beforeLines[file], after: afterLines[file] ?? null })),
   }
+
+  verify.againstBase = checkAgainstBase(root, options.base, before, verify.patch.files.map((f) => f.path))
 
   const failures = Object.entries(verify.packages).flatMap(([pkg, result]) => [
     ...(result.typecheck.ok ? [] : [`${pkg}: typecheck failed`]),
@@ -112,7 +143,7 @@ function main() {
     return finish()
   }
   verify.verdict = 'accepted'
-  verify.reason = `Only unit test files changed; typecheck passed; ${RUNS}/${RUNS} runs green.`
+  verify.reason = `Only unit test files changed; typecheck passed; ${RUNS}/${RUNS} runs green (last one in shuffled order).`
   finish()
 }
 
