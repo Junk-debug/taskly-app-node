@@ -3,7 +3,7 @@ import { computeStats } from '../src/features/todos/stats.ts';
 import { todo } from './fixture.ts';
 
 it('returns zeros for an empty list', () => {
-  expect(computeStats([], '2026-10-15')).toEqual({ total: 0, active: 0, completed: 0, overdue: 0, byPriority: { low: 0, medium: 0, high: 0 } });
+  expect(computeStats([], '2026-10-15')).toEqual({ total: 0, active: 0, completed: 0, overdue: 0, dueToday: 0, byPriority: { low: 0, medium: 0, high: 0 } });
 });
 it('counts active, completed and priorities', () => {
   const todos = [
@@ -11,7 +11,7 @@ it('counts active, completed and priorities', () => {
     { ...todo, completed: true, priority: 'low' as const, due_date: null },
     { ...todo, priority: 'medium' as const, due_date: null },
   ];
-  expect(computeStats(todos, '2026-10-15')).toEqual({ total: 3, active: 2, completed: 1, overdue: 0, byPriority: { low: 1, medium: 1, high: 1 } });
+  expect(computeStats(todos, '2026-10-15')).toEqual({ total: 3, active: 2, completed: 1, overdue: 0, dueToday: 0, byPriority: { low: 1, medium: 1, high: 1 } });
 });
 it('sums every overdue active task and ignores completed, due-today and undated ones', () => {
   const todos = [
@@ -22,6 +22,17 @@ it('sums every overdue active task and ignores completed, due-today and undated 
     { ...todo, due_date: null },
   ];
   expect(computeStats(todos, '2026-10-15').overdue).toBe(2);
+});
+it('counts only active tasks due exactly today as due today', () => {
+  const todos = [
+    { ...todo, due_date: '2026-10-15' },
+    { ...todo, due_date: '2026-10-15' },
+    { ...todo, due_date: '2026-10-15', completed: true },
+    { ...todo, due_date: '2026-10-14' },
+    { ...todo, due_date: '2026-10-16' },
+    { ...todo, due_date: null },
+  ];
+  expect(computeStats(todos, '2026-10-15').dueToday).toBe(2);
 });
 it.each([
   ['2026-10-14', false, 1],
