@@ -55,7 +55,7 @@ function verifySection(verify) {
     lines.push('', '**Do the tests notice the change?** Each test file was re-run with the changed sources reverted to the base branch:', '')
     lines.push('| Test file | Against base code | Verdict |', '|---|---|---|')
     for (const r of verify.againstBase) {
-      const counts = r.total === null ? 'did not load' : `${r.failed}/${r.total} failing`
+      const counts = !r.total ? 'did not load' : `${r.failed}/${r.total} failing`
       lines.push(`| \`${r.file}\` | ${counts} | ${r.detectsChange ? '🛡️ guards the change' : '📘 passes without the change'} |`)
     }
   }
