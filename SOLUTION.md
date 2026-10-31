@@ -111,7 +111,10 @@ PRs, including a planted bug and a prompt injection. See [Example run](#example-
     subscription, then
     `pbpaste | tr -d '[:space:]' | gh secret set CLAUDE_CODE_OAUTH_TOKEN`.
     Stripping whitespace matters: a wrapped token gives `401 OAuth access token is invalid`.
-  - or `ANTHROPIC_API_KEY` from the Claude Console.
+  - or `ANTHROPIC_API_KEY` from the Claude Console. The workflow and the
+    action accept either secret, but every run in this repository used the
+    subscription token; the API-key path is supported, not exercised here.
+    With an API key, `--max-budget-usd 3` is a real spend cap.
 
   Without a secret, the workflow posts "skipped: no credentials" and passes.
 
@@ -121,6 +124,10 @@ Open a pull request, or mark a draft *Ready for review*. The workflow runs on
 `opened`, `synchronize`, `reopened` and `ready_for_review`. It skips drafts and
 PRs from forks, which have no secrets. A new push cancels the run in progress
 for that PR.
+
+Keep a PR in **draft** while you iterate and mark it *Ready for review* when
+the change is done. Every push to a non-draft PR that leaves changed lines
+uncovered starts an agent run.
 
 ### Locally
 
