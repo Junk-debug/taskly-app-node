@@ -51,7 +51,19 @@ function verifySection(verify) {
     const green = result.runs.filter((r) => r.ok).length
     lines.push(`- \`${pkg}\`: typecheck ${result.typecheck.ok ? 'ok' : 'failed'}, ${green}/${result.runs.length} test runs green`)
   }
+  if (verify.againstBase?.length) {
+    lines.push('', '**Do the tests notice the change?** Each test file was re-run with the changed sources reverted to the base branch:', '')
+    lines.push('| Test file | Against base code | Verdict |', '|---|---|---|')
+    for (const r of verify.againstBase) {
+      const counts = r.total === null ? 'did not load' : `${r.failed}/${r.total} failing`
+      lines.push(`| \`${r.file}\` | ${counts} | ${r.detectsChange ? '🛡️ guards the change' : '📘 passes without the change'} |`)
+    }
+  }
   return [...lines, '']
+}
+
+function neutralize(text) {
+  return text.replace(/@(?=[A-Za-z0-9-])/g, '@\u200b').replaceAll('<!--', '&lt;!--')
 }
 
 function readText(file) {
@@ -72,6 +84,7 @@ function main() {
   } else {
     const agentReport = readText(options['agent-report'])
     const agentResult = readText(options['agent-result'])
+    lines.push('### Measured by the workflow', '')
     if (analysis) lines.push(...analysisSection(analysis))
     if (verify) lines.push(...verifySection(verify))
     if (guard) {
@@ -85,7 +98,7 @@ function main() {
       if (agentResult) lines.push('```', agentResult, '```', '')
     }
     if (agentReport) {
-      lines.push('<details open><summary><b>Agent report</b></summary>', '', agentReport.slice(0, 8000), '', '</details>', '')
+      lines.push('### Reported by the agent (not verified)', '', '<details open><summary>Agent report</summary>', '', neutralize(agentReport.slice(0, 8000)), '', '</details>', '')
     }
   }
 
