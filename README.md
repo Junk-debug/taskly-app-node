@@ -134,3 +134,15 @@ Coverage — `backend/coverage/index.html`:
 ```sh
 npm run test:coverage
 ```
+
+## Task statistics
+
+`GET /api/todos/stats` returns task counts:
+
+```json
+{ "total": 5, "active": 3, "completed": 2, "overdue": 1, "dueToday": 1, "byPriority": { "low": 1, "medium": 2, "high": 2 } }
+```
+
+`overdue` and `dueToday` count only active tasks and compare due dates with
+the current UTC date. The frontend shows the same summary above the task list,
+using the browser's local date.

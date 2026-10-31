@@ -18,6 +18,28 @@ it('lists tasks from the repository', async () => {
   expect(response.body).toEqual([todo]);
   expect(repository.list).toHaveBeenCalledOnce();
 });
+it('returns statistics for the stored tasks instead of treating stats as an id', async () => {
+  vi.useFakeTimers({ now: new Date('2026-10-20T10:00:00Z'), toFake: ['Date'] });
+  try {
+    const { app, repository } = setup();
+    const response = await request(app).get('/api/todos/stats');
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ total: 1, active: 1, completed: 0, overdue: 1, dueToday: 0, byPriority: { low: 0, medium: 0, high: 1 } });
+    expect(repository.get).not.toHaveBeenCalled();
+  } finally {
+    vi.useRealTimers();
+  }
+});
+it('counts a task due on the current UTC date as due today in the statistics', async () => {
+  vi.useFakeTimers({ now: new Date('2026-10-15T10:00:00Z'), toFake: ['Date'] });
+  try {
+    const { app } = setup();
+    const response = await request(app).get('/api/todos/stats');
+    expect(response.body).toEqual({ total: 1, active: 1, completed: 0, overdue: 0, dueToday: 1, byPriority: { low: 0, medium: 0, high: 1 } });
+  } finally {
+    vi.useRealTimers();
+  }
+});
 it('creates tasks with trimmed input and defaults', async () => {
   const { app, repository } = setup();
   const response = await request(app).post('/api/todos').send({ title: '  Plan the sprint  ', priority: 'high' });

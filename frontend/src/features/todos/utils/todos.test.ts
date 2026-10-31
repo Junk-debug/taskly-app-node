@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { formatDate, isOverdue, selectTodos, validateTodo } from './todos'
+import {
+  formatDate,
+  isDueToday,
+  isOverdue,
+  selectTodos,
+  summarizeTodos,
+  validateTodo,
+} from './todos'
 import type { Todo, TodoInput } from '../types'
 
 const base: Todo = {
@@ -130,6 +137,49 @@ describe('isOverdue', () => {
   ])('due %s, completed %s → overdue %s', (due_date, completed, expected) => {
     vi.useFakeTimers({ now: new Date(2026, 9, 15, 9, 0) })
     expect(isOverdue({ ...base, due_date, completed })).toBe(expected)
+  })
+})
+
+describe('isDueToday', () => {
+  it.each([
+    ['2026-10-14', false, false],
+    ['2026-10-15', false, true],
+    ['2026-10-16', false, false],
+    ['2026-10-15', true, false],
+    [null, false, false],
+  ])('due %s, completed %s → due today %s', (due_date, completed, expected) => {
+    vi.useFakeTimers({ now: new Date(2026, 9, 15, 9, 0) })
+    expect(isDueToday({ ...base, due_date, completed })).toBe(expected)
+  })
+})
+
+describe('summarizeTodos', () => {
+  it('returns zeros for an empty list', () => {
+    expect(summarizeTodos([])).toEqual({
+      total: 0,
+      active: 0,
+      completed: 0,
+      overdue: 0,
+      dueToday: 0,
+    })
+  })
+
+  it('counts active, completed, overdue and due-today tasks', () => {
+    vi.useFakeTimers({ now: new Date(2026, 9, 15, 9, 0) })
+    const todos: Todo[] = [
+      { ...base, id: 1, due_date: '2026-10-14' },
+      { ...base, id: 2, due_date: '2026-10-15' },
+      { ...base, id: 3, due_date: '2026-10-15' },
+      { ...base, id: 4, due_date: '2026-10-14', completed: true },
+      { ...base, id: 5 },
+    ]
+    expect(summarizeTodos(todos)).toEqual({
+      total: 5,
+      active: 4,
+      completed: 1,
+      overdue: 1,
+      dueToday: 2,
+    })
   })
 })
 
