@@ -91,8 +91,9 @@ Do not:
 - Use snapshots for logic or for whole component trees.
 - Assert styles, class names or styled-components internals.
 - Test third-party libraries (zod, React Query, Express) instead of our code.
-- Change production code to make a test pass. If the code looks wrong, keep the
-  test that shows the bug as `it.fails` or leave it out, and report it.
+- Change production code to make a test pass. If the code looks wrong, leave
+  that case out (do not commit a failing or `it.fails` test) and report the
+  suspected bug with the expected and actual values.
 - Weaken or delete an existing assertion to make a test pass.
 
 ## Examples: bad → good

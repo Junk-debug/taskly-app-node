@@ -147,7 +147,7 @@ the guard's audit log.
 
 ```
 unit-test-agent (main thread, --agent)
-├─ preloaded: analyze-changes, run-and-fix-tests, report-results
+├─ skills are loaded on demand through the Skill tool (see note below)
 ├─ 1. analyze-changes ── scripts/changed-sources.mjs → decide create/update/skip per file
 ├─ 2. write-backend-unit-test / write-frontend-unit-test (loaded only when needed)
 │     └─ reads TESTING.md; templates.md holds verified Query-hook and fetch patterns
@@ -164,6 +164,12 @@ guard hook (PreToolUse): every Write/Edit/Bash call is checked and logged
 | `write-frontend-unit-test` | React, RTL and TanStack Query test procedure | `templates.md` (verified) |
 | `run-and-fix-tests` | Run, rerun, classify failures, at most 3 fix attempts | – |
 | `report-results` | Report format and rules | – |
+
+The agent lists `analyze-changes`, `run-and-fix-tests` and `report-results`
+under `skills:`. That preloads them when the agent runs as a subagent. When it
+is the main thread (`--agent`, as here), Claude Code ignores the list, and the
+logs show the agent loading every skill through the Skill tool. Each skill
+description says when to use it, so they are still picked up in order.
 
 The skills are reusable. The same skills ran in the local coverage run
 (`--files` mode), in CI (`--base`/`--head` mode) and in a person's interactive
@@ -208,7 +214,7 @@ on three pushes:
 | `frontend/.../TodosPage.tsx` | skip | The change is wiring, and `TodosPage.test.tsx` already passes. |
 
 **Skills used:**
-- `analyze-changes`, preloaded, ran the script with `--base <PR base sha>`.
+- `analyze-changes`, loaded first, ran the script with `--base <PR base sha>`.
 - `write-backend-unit-test` and `write-frontend-unit-test` were loaded on demand.
 - `run-and-fix-tests`, then the `test-reviewer` subagent, then `report-results`.
 
@@ -310,6 +316,7 @@ GitHub records them as `action_required` runs that never execute.
 | Issue | Fix |
 |---|---|
 | An untrusted workspace silently ignores project hooks and permissions | The guard is passed through `settings` in CI, and the audit log is required |
+| `skills:` preloading is ignored when the agent is the main thread (`--agent`) | Nothing to fix: the agent loads skills through the Skill tool. Documented above |
 | `paths:` hid the test-writing skills until a matching file was read ("Unknown skill") | Removed `paths:` |
 | The Glob and Grep tools are not available in this Claude Code version | The guard allows read-only `ls`, `find` and `grep` |
 | Claude Code rejects `"$schema": draft 2020-12` in `--json-schema` | Removed the key, then dropped the schema |
