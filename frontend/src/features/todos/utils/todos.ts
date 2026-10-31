@@ -56,10 +56,17 @@ export function selectTodos(
     })
 }
 
-export function isOverdue(todo: Todo): boolean {
+function localToday(): string {
   const today = new Date()
-  const localDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
-  return !todo.completed && !!todo.due_date && todo.due_date < localDate
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+}
+
+export function isOverdue(todo: Todo): boolean {
+  return !todo.completed && !!todo.due_date && todo.due_date < localToday()
+}
+
+export function isDueToday(todo: Todo): boolean {
+  return !todo.completed && todo.due_date === localToday()
 }
 
 export function formatDate(date: string): string {
@@ -75,6 +82,7 @@ export interface TodoSummary {
   active: number
   completed: number
   overdue: number
+  dueToday: number
 }
 
 export function summarizeTodos(todos: Todo[]): TodoSummary {
@@ -84,7 +92,8 @@ export function summarizeTodos(todos: Todo[]): TodoSummary {
       active: summary.active + (todo.completed ? 0 : 1),
       completed: summary.completed + (todo.completed ? 1 : 0),
       overdue: summary.overdue + (isOverdue(todo) ? 1 : 0),
+      dueToday: summary.dueToday + (isDueToday(todo) ? 1 : 0),
     }),
-    { total: 0, active: 0, completed: 0, overdue: 0 },
+    { total: 0, active: 0, completed: 0, overdue: 0, dueToday: 0 },
   )
 }

@@ -7,6 +7,7 @@ export function TodoStats({ todos }: { todos: Todo[] }) {
   if (summary.total === 0) return null
   const parts = [`${summary.active} active`, `${summary.completed} completed`]
   if (summary.overdue > 0) parts.push(`${summary.overdue} overdue`)
+  if (summary.dueToday > 0) parts.push(`${summary.dueToday} due today`)
   return (
     <Text muted size="small" aria-label="Task summary">
       {parts.join(' · ')}
