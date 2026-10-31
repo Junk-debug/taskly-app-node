@@ -97,6 +97,12 @@ jobs:
         run: |
           npm ci --prefix backend
           npm ci --prefix frontend
+      - name: Install bubblewrap for subprocess isolation
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq bubblewrap
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          bwrap --ro-bind / / --unshare-all true && echo "bubblewrap works"
       - name: Run unit-test-agent
         id: agent
         uses: anthropics/claude-code-action@6d5ae526d25ce88daa2200be073e1a373167f064 # v1
