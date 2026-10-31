@@ -1,12 +1,13 @@
 import { QueryClient, useQueryClient } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import { useTheme } from 'styled-components'
-import { expect, it, vi } from 'vitest'
+import { beforeEach, expect, it, vi } from 'vitest'
 import { GlobalStyles, theme } from '../design-system/mocks'
 import { queryClient } from '../lib/queryClient'
 import { AppProviders } from './AppProviders'
 
 vi.mock('../design-system', () => import('../design-system/mocks'))
+beforeEach(() => vi.clearAllMocks())
 
 function Probe() {
   const client = useQueryClient()
