@@ -40,6 +40,15 @@ jobs:
           cache-dependency-path: |
             backend/package-lock.json
             frontend/package-lock.json
+      - name: Check out the workflow tooling from the base branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.BASE_SHA }}
+          path: .trusted-tooling
+          sparse-checkout: |
+            .claude/skills/analyze-changes/scripts
+            .github/scripts
+          persist-credentials: false
       - name: Install dependencies
         run: |
           npm ci --prefix backend
@@ -47,7 +56,7 @@ jobs:
       - name: Find changed sources and uncovered changed lines
         id: analyze
         run: |
-          node .claude/skills/analyze-changes/scripts/changed-sources.mjs --base "$BASE_SHA" --head "$HEAD_SHA" > analysis.json
+          node .trusted-tooling/.claude/skills/analyze-changes/scripts/changed-sources.mjs --base "$BASE_SHA" --head "$HEAD_SHA" > analysis.json
           jq . analysis.json
           echo "needs_agent=$(jq -r .needsAgent analysis.json)" >> "$GITHUB_OUTPUT"
       - name: Check for Claude credentials
@@ -93,6 +102,7 @@ jobs:
         uses: anthropics/claude-code-action@6d5ae526d25ce88daa2200be073e1a373167f064 # v1
         env:
           TEST_AGENT_GUARD_LOG: ${{ runner.temp }}/guard.log
+          CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: '1'
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -117,6 +127,7 @@ jobs:
           claude_args: |
             --agent unit-test-agent
             --max-turns 80
+            --max-budget-usd 3
             --permission-mode acceptEdits
             --allowedTools "Read,Write,Edit,Skill,Agent,Glob,Grep,Bash(cd backend),Bash(cd frontend),Bash(cd ../backend),Bash(cd ../frontend),Bash(cd ..),Bash(npx vitest run *),Bash(npx vitest related *),Bash(npx tsc --noEmit),Bash(npx prettier --write *),Bash(node .claude/skills/analyze-changes/scripts/changed-sources.mjs *),Bash(git diff *),Bash(git log *),Bash(git status *),Bash(git show *),Bash(ls *),Bash(find *),Bash(grep *)"
       - name: Show the agent's final result
@@ -170,6 +181,15 @@ jobs:
           cache-dependency-path: |
             backend/package-lock.json
             frontend/package-lock.json
+      - name: Check out the workflow tooling from the base branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.BASE_SHA }}
+          path: .trusted-tooling
+          sparse-checkout: |
+            .claude/skills/analyze-changes/scripts
+            .github/scripts
+          persist-credentials: false
       - name: Install dependencies
         run: |
           npm ci --prefix backend
@@ -178,11 +198,12 @@ jobs:
         with:
           path: ${{ runner.temp }}/artifacts
           merge-multiple: true
-      - name: Check paths, typecheck, run tests three times, re-measure coverage
+      - name: Check paths, typecheck, run tests three times, check tests against base code, re-measure coverage
         run: |
           A="$RUNNER_TEMP/artifacts"
           mkdir -p "$RUNNER_TEMP/verify"
-          node .github/scripts/verify-tests.mjs \
+          node .trusted-tooling/.github/scripts/verify-tests.mjs \
+            --analyzer .trusted-tooling/.claude/skills/analyze-changes/scripts/changed-sources.mjs \
             --patch "$A/tests.patch" \
             --base "$BASE_SHA" \
             --analysis "$A/analysis.json" \
